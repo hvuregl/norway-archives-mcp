@@ -14,6 +14,8 @@ import uvicorn
 from jwt import PyJWKClient
 from starlette.responses import JSONResponse, Response
 
+from mcp.server.transport_security import TransportSecuritySettings
+
 from .server import mcp
 
 AUDIENCE = "https://norway-archives-mcp.example/api"
@@ -122,7 +124,7 @@ def create_app():
     if not public_url.endswith("/mcp"):
         raise ValueError("MCP_PUBLIC_URL must end with /mcp")
     return Auth0Gate(
-        mcp.streamable_http_app(),
+        mcp.streamable_http_app(\n            stateless_http=True,\n            transport_security=TransportSecuritySettings(\n                enable_dns_rebinding_protection=True,\n                allowed_hosts=[urlsplit(public_url).netloc],\n            ),\n        ),
         issuer=issuer,
         resource=public_url,
     )
