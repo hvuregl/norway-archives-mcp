@@ -18,7 +18,6 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from .server import mcp
 
-AUDIENCE = "https://norway-archives-mcp.example/api"
 REQUIRED_SCOPE = "read:archives"
 
 
@@ -66,7 +65,7 @@ class Auth0Gate:
 
         headers = dict(scope.get("headers", []))
         auth_header = headers.get(b"authorization", b"").decode("latin-1")
-        if not auth_header.startswith("Bearer "):
+        if not auth_header.lower().startswith("bearer "):
             await self._deny(scope, receive, send)
             return
 
@@ -97,7 +96,7 @@ class Auth0Gate:
             token,
             signing_key.key,
             algorithms=["RS256"],
-            audience=AUDIENCE,
+            audience=self.resource,
             issuer=self.issuer,
             options={"require": ["exp", "iat", "iss", "aud", "sub"]},
             leeway=30,
@@ -122,6 +121,8 @@ class Auth0Gate:
 def create_app():
     issuer = _https_url(os.environ["AUTH0_ISSUER"], "AUTH0_ISSUER")
     public_url = _https_url(os.environ["MCP_PUBLIC_URL"], "MCP_PUBLIC_URL")
+    if urlsplit(public_url).username or urlsplit(public_url).password:
+        raise ValueError("MCP_PUBLIC_URL cannot contain userinfo")
     if not public_url.endswith("/mcp"):
         raise ValueError("MCP_PUBLIC_URL must end with /mcp")
     return Auth0Gate(
