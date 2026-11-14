@@ -37,13 +37,14 @@ class Auth0Gate:
         self.issuer = issuer.rstrip("/") + "/"
         self.resource = resource
         self.jwks = PyJWKClient(self.issuer + ".well-known/jwks.json", cache_jwk_set=True)
-        public_origin = resource.rsplit("/mcp", 1)[0]
+        public_origin = resource.removesuffix("/mcp")
         self.metadata_path = "/.well-known/oauth-protected-resource/mcp"
         self.metadata_url = public_origin + self.metadata_path
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
-            await self.app(scope, receive, send)
+            if scope["type"] == "websocket":
+                await send({"type": "websocket.close", "code": 1008})
             return
 
         path = scope.get("path", "")
@@ -124,7 +125,13 @@ def create_app():
     if not public_url.endswith("/mcp"):
         raise ValueError("MCP_PUBLIC_URL must end with /mcp")
     return Auth0Gate(
-        mcp.streamable_http_app(\n            stateless_http=True,\n            transport_security=TransportSecuritySettings(\n                enable_dns_rebinding_protection=True,\n                allowed_hosts=[urlsplit(public_url).netloc],\n            ),\n        ),
+        mcp.streamable_http_app(
+            stateless_http=True,
+            transport_security=TransportSecuritySettings(
+                enable_dns_rebinding_protection=True,
+                allowed_hosts=[urlsplit(public_url).netloc],
+            ),
+        ),
         issuer=issuer,
         resource=public_url,
     )
