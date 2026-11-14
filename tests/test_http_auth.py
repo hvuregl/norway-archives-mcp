@@ -10,10 +10,13 @@ async def _app(scope, receive, send):
 
 async def _request(gate, path="/mcp", headers=None):
     messages = []
+
     async def receive():
         return {"type": "http.request", "body": b"", "more_body": False}
+
     async def send(message):
         messages.append(message)
+
     await gate(
         {"type": "http", "method": "POST", "path": path, "headers": headers or []},
         receive,
@@ -66,3 +69,38 @@ def test_bad_token_is_rejected():
         _request(gate, headers=[(b"authorization", b"Bearer clearly-not-a-jwt")])
     )
     assert response[0]["status"] == 401
+
+
+def test_missing_scope_is_forbidden(monkeypatch):
+    gate = Auth0Gate(
+        _app,
+        issuer="https://example.us.auth0.com",
+        resource="https://archives.onrender.com/mcp",
+    )
+    monkeypatch.setattr(gate, "_verify_jwt", lambda _: {"scope": "openid profile"})
+    response = asyncio.run(
+        _request(gate, headers=[(b"authorization", b"Bearer valid-mock-token")])
+    )
+    assert response[0]["status"] == 403
+
+
+def test_permission_grants_access_to_mcp_app(monkeypatch):
+    seen = []
+
+    async def protected_app(scope, receive, send):
+        seen.append(scope["path"])
+        await Response(status_code=204)(scope, receive, send)
+
+    from starlette.responses import Response
+
+    gate = Auth0Gate(
+        protected_app,
+        issuer="https://example.us.auth0.com",
+        resource="https://archives.onrender.com/mcp",
+    )
+    monkeypatch.setattr(gate, "_verify_jwt", lambda _: {"permissions": ["read:archives"]})
+    response = asyncio.run(
+        _request(gate, headers=[(b"authorization", b"Bearer valid-mock-token")])
+    )
+    assert response[0]["status"] == 204
+    assert seen == ["/mcp"]
