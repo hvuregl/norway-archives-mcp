@@ -41,6 +41,10 @@ class Auth0Gate:
         self.metadata_url = public_origin + self.metadata_path
 
     async def __call__(self, scope, receive, send):
+        if scope["type"] == "lifespan":
+            # The MCP Streamable HTTP session manager is initialized here.
+            await self.app(scope, receive, send)
+            return
         if scope["type"] != "http":
             if scope["type"] == "websocket":
                 await send({"type": "websocket.close", "code": 1008})
