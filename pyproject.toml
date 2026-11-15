@@ -27,6 +27,8 @@ dependencies = [
     # tool registry, which a major release is free to change.
     "mcp>=2.0.0,<3",
     "httpx>=0.27,<1",
+    "PyJWT[crypto]>=2.9,<3",
+    "uvicorn>=0.30,<1",
     "pydantic>=2.6",
     "python-dotenv>=1.0",
     # Digitalarkivet publishes HTML pages, not an API. 4.12 is the first
